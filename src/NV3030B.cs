@@ -1,21 +1,16 @@
-using System;
 using System.Device.Gpio;
 using System.Device.Spi;
-using System.Drawing;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
-using Iot.Device.Graphics;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Sang.IoT.NV3030B
 {
     /// <summary>
     /// NV3030B LCD Display Driver
     /// </summary>
-    public partial class NV3030B : GraphicDisplay
+    public partial class NV3030B: IDisposable
     {
         private const int DefaultSPIBufferSize = 0x1000;
-        private const byte LcdPortraitConfig = 0x00;
 
         private readonly int _dcPinId;
         private readonly int _resetPinId;
@@ -25,24 +20,22 @@ namespace Sang.IoT.NV3030B
 
         private SpiDevice _spiDevice;
         private GpioController _gpioDevice;
-        private GpioDriver _pwm;
 
-        private Rgb565[] _screenBuffer;
-        private Rgb565[] _previousBuffer;
+        private byte[] _screenBuffer;
 
         private double _fps;
         private DateTimeOffset _lastUpdate;
 
         /// <summary>
-        /// Initializes new instance of NV3030B device that will communicate using SPI bus.
+        /// 初始化一个新的 NV3030B 设备实例，该实例将使用 SPI 总线进行通信。
         /// </summary>
-        /// <param name="spiDevice">The SPI device used for communication.</param>
-        /// <param name="dataCommandPin">The GPIO pin used for DC (data/command).</param>
-        /// <param name="resetPin">The GPIO pin used for RST (reset).</param>
-        /// <param name="backlightPin">The pin for backlight PWM control.</param>
-        /// <param name="spiBufferSize">Size of SPI buffer.</param>
-        /// <param name="gpioController">GPIO controller instance.</param>
-        /// <param name="shouldDispose">True to dispose GPIO controller when done.</param>
+        /// <param name="spiDevice">用于通信的 SPI 设备。</param>
+        /// <param name="dataCommandPin">用于 DC（数据/命令）的 GPIO 引脚。</param>
+        /// <param name="resetPin">用于 RST（复位）的 GPIO 引脚。</param>
+        /// <param name="backlightPin">用于背光 PWM 控制的引脚。</param>
+        /// <param name="spiBufferSize">SPI 缓冲区大小。</param>
+        /// <param name="gpioController">GPIO 控制器实例。</param>
+        /// <param name="shouldDispose">完成时是否释放 GPIO 控制器。</param>
         public NV3030B(SpiDevice spiDevice, int dataCommandPin, int resetPin, int backlightPin = -1, 
             int spiBufferSize = DefaultSPIBufferSize, GpioController? gpioController = null, bool shouldDispose = true)
         {
@@ -77,25 +70,20 @@ namespace Sang.IoT.NV3030B
             ResetDisplayAsync().Wait();
             Initialize();
 
-            _screenBuffer = new Rgb565[ScreenWidth * ScreenHeight];
-            _previousBuffer = new Rgb565[ScreenWidth * ScreenHeight];
-
+            _screenBuffer = new byte[ScreenWidth * ScreenHeight * 2];
             // Clear display
-            SendFrame(true);
+            SendFrame();
         }
 
         /// <summary>
         /// Screen width in pixels
         /// </summary>
-        public override int ScreenWidth => 240;
+        public virtual int ScreenWidth => 240;
 
         /// <summary>
         /// Screen height in pixels
         /// </summary>
-        public override int ScreenHeight => 280;
-
-        /// <inheritdoc />
-        public override PixelFormat NativePixelFormat => PixelFormat.Format16bppRgb565;
+        public virtual int ScreenHeight => 280;
 
         /// <summary>
         /// Current FPS value
@@ -250,10 +238,77 @@ namespace Sang.IoT.NV3030B
             _gpioDevice.Write(_backlightPin, brightness > 0 ? PinValue.High : PinValue.Low);
         }
 
-        /// <inheritdoc/>
-        protected override void Dispose(bool disposing)
+        // Implementation of GraphicDisplay abstract methods
+        public void ClearScreen()
         {
-            if (disposing)
+            Array.Clear(_screenBuffer, 0, _screenBuffer.Length);
+            SendFrame();
+        }
+
+        /// <summary>
+        /// Send frame buffer to display
+        /// </summary>
+        public void SendFrame()
+        {
+            SetWindow(0, 0, ScreenWidth, ScreenHeight);
+            _gpioDevice.Write(_dcPinId, PinValue.High);
+
+            // 使用固定大小块发送数据
+            for (int i = 0; i < _screenBuffer.Length; i += _spiBufferSize)
+            {
+                int length = Math.Min(_spiBufferSize, _screenBuffer.Length - i);
+                var chunk = _screenBuffer.AsSpan(i, length);
+                _spiDevice.Write(chunk);
+                // 打印第一块数据用于调试
+                if (i == 0)
+                {
+                    Console.WriteLine($"First chunk data: {BitConverter.ToString(chunk.ToArray())}");
+                }
+            }
+            UpdateFps();
+        }
+
+        public void ShowImage(Image<Bgr24> image)
+        {
+            int imwidth = image.Width;
+            int imheight = image.Height;
+            if (imwidth > ScreenWidth || imheight > ScreenHeight)
+            {
+                throw new ArgumentException("Image dimensions exceed screen dimensions.");
+            }
+
+            var pix = new byte[imheight * imwidth * 2];
+            for (int y = 0; y < imheight; y++)
+            {
+            for (int x = 0; x < imwidth; x++)
+            {
+                var color = image[x, y];
+                int index = (y * imwidth + x) * 2;
+                pix[index] = (byte)((color.R & 0xF8) | (color.G >> 5));
+                pix[index + 1] = (byte)(((color.G << 3) & 0xE0) | (color.B >> 3));
+            }
+            }
+
+            Array.Clear(_screenBuffer, 0, _screenBuffer.Length);
+            Array.Copy(pix, _screenBuffer, pix.Length);
+            SendFrame();
+        }
+
+        private void UpdateFps()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var ts = now - _lastUpdate;
+            if (ts <= TimeSpan.FromMilliseconds(1))
+            {
+                ts = TimeSpan.FromMilliseconds(1);
+            }
+            _fps = 1.0 / ts.TotalSeconds;
+            _lastUpdate = now;
+        }
+
+        public void Dispose()
+        {
+            if (_shouldDispose)
             {
                 if (_gpioDevice != null)
                 {
@@ -271,74 +326,6 @@ namespace Sang.IoT.NV3030B
                 _spiDevice?.Dispose();
                 _spiDevice = null;
             }
-        }
-
-        // Implementation of GraphicDisplay abstract methods
-        public override void ClearScreen()
-        {
-            Array.Clear(_screenBuffer, 0, _screenBuffer.Length);
-            SendFrame(true);
-        }
-
-        public override bool CanConvertFromPixelFormat(PixelFormat format)
-        {
-            return format == PixelFormat.Format32bppArgb || 
-                   format == PixelFormat.Format32bppXrgb ||
-                   format == PixelFormat.Format16bppRgb565;
-        }
-
-        public override BitmapImage GetBackBufferCompatibleImage()
-        {
-            return BitmapImage.CreateBitmap(ScreenWidth, ScreenHeight, PixelFormat.Format32bppArgb);
-        }
-
-        /// <summary>
-        /// Send frame buffer to display
-        /// </summary>
-        public void SendFrame(bool forceFull)
-        {
-            // 移除forceFull判断，强制每次都发送完整帧
-            SetWindow(0, 0, ScreenWidth - 1, ScreenHeight - 1);
-            _gpioDevice.Write(_dcPinId, PinValue.High);
-
-            var buffer = new byte[_screenBuffer.Length * 2];
-            for (int i = 0; i < _screenBuffer.Length; i++)
-            {
-                var value = _screenBuffer[i].PackedValue;
-                // 修改字节顺序与Python代码保持一致
-                buffer[i * 2] = (byte)(value & 0xFF);        // 低字节
-                buffer[i * 2 + 1] = (byte)((value >> 8) & 0xFF);     // 高字节
-            }
-
-            // 使用固定大小块发送数据
-            const int chunkSize = 4096;  // 与Python代码使用相同的块大小
-            for (int i = 0; i < buffer.Length; i += chunkSize)
-            {
-                int length = Math.Min(chunkSize, buffer.Length - i);
-                var chunk = buffer.AsSpan(i, length);
-                _spiDevice.Write(chunk);
-                
-                // 打印第一块数据用于调试
-                if (i == 0)
-                {
-                    Console.WriteLine($"First chunk data: {BitConverter.ToString(chunk.ToArray())}");
-                }
-            }
-
-            Array.Copy(_screenBuffer, _previousBuffer, _screenBuffer.Length);
-            UpdateFps();
-        }
-
-        private void UpdateFps()
-        {
-            var now = DateTimeOffset.UtcNow;
-            var ts = now - _lastUpdate;
-            if (ts <= TimeSpan.FromMilliseconds(1))
-            {
-                ts = TimeSpan.FromMilliseconds(1);
-            }
-            _fps = 1.0 / ts.TotalSeconds;
-            _lastUpdate = now;
         }
     }
 }
