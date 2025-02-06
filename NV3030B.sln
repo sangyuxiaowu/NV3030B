@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35707.178
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NV3030B.Test", "test\NV3030B.Test.csproj", "{0B269097-DCAA-48FC-8C2B-A8A8C0CF62C9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sang.IoT.NV3030B", "src\Sang.IoT.NV3030B.csproj", "{A6708EFD-FF57-4AE8-83A1-53FE6148FEF7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0B269097-DCAA-48FC-8C2B-A8A8C0CF62C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B269097-DCAA-48FC-8C2B-A8A8C0CF62C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B269097-DCAA-48FC-8C2B-A8A8C0CF62C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B269097-DCAA-48FC-8C2B-A8A8C0CF62C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6708EFD-FF57-4AE8-83A1-53FE6148FEF7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6708EFD-FF57-4AE8-83A1-53FE6148FEF7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6708EFD-FF57-4AE8-83A1-53FE6148FEF7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6708EFD-FF57-4AE8-83A1-53FE6148FEF7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
