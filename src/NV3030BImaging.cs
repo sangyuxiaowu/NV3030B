@@ -8,7 +8,7 @@ namespace Sang.IoT.NV3030B
     public partial class NV3030B
     {
         /// <summary>
-        /// Send a bitmap to the Ili9341 display specifying the starting position and destination clipping rectangle.
+        /// Send a bitmap to the NV3030B display specifying the starting position and destination clipping rectangle.
         /// </summary>
         /// <param name="bm">The bitmap to be sent to the display controller note that only Pixel Format Format32bppArgb is supported.</param>
         /// <param name="sourcePoint">A coordinate point in the source bitmap where copying starts from.</param>
