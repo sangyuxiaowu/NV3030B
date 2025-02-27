@@ -7,7 +7,7 @@ import time
 import logging
 import spidev as SPI
 sys.path.append("..")
-from lib import LCD_1inch5
+import LCD_1inch5
 from PIL import Image,ImageDraw,ImageFont
 
 # Raspberry Pi pin configuration:
