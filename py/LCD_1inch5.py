@@ -233,6 +233,11 @@ class LCD_1inch5(lcdconfig.RaspberryPi):
         pix = pix.flatten().tolist()
         self.SetWindows ( 0, 0, self.width, self.height)
         self.digital_write(self.DC_PIN,self.GPIO.HIGH)
+
+        # 存储pix二进制到文件
+        with open("pix.bin", "wb") as f:
+            f.write(bytes(pix))
+
         for i in range(0,len(pix),4096):
             self.spi_writebyte(pix[i:i+4096])		
             
