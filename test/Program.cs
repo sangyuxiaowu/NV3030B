@@ -47,7 +47,11 @@ class Program
 
             Console.WriteLine("All tests completed.");
 
-            Task.Delay(5000).Wait();
+            Task.Delay(10000).Wait();
+
+            await TestBin(display);
+
+            Task.Delay(50000).Wait();
         }
         catch (Exception ex)
         {
@@ -72,4 +76,22 @@ class Program
             Console.WriteLine($"Failed to load or display image: {ex.Message}");
         }
     }
+    private static async Task TestBin(NV3030B display)
+    {
+        Console.WriteLine("Testing image display");
+
+        try
+        {
+            // 读取bin文件
+            using var fs = new FileStream("pix.bin", FileMode.Open);
+            byte[] buffer = new byte[fs.Length];
+            fs.Read(buffer, 0, buffer.Length);
+            display.SendBitmapPixelData(buffer, new System.Drawing.Rectangle(0,0,240,280));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load or display image: {ex.Message}");
+        }
+    }
+
 }
