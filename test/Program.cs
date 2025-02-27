@@ -8,9 +8,9 @@ using SixLabors.ImageSharp.PixelFormats;
 
 class Program
 {
-    const int pinID_DC = 42;
-    const int pinID_Reset = 33;
-    const int pinID_BL = 40;
+    const int pinID_DC = 25;
+    const int pinID_Reset = 27;
+    const int pinID_BL = 18;
 
     static async Task Main(string[] args)
     {
