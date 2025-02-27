@@ -386,7 +386,11 @@ namespace Sang.IoT.NV3030B
                     if (_resetPinId >= 0)
                         _gpioDevice.ClosePin(_resetPinId);
                     if (_backlightPin >= 0)
+                    {
+                        _backlightChannel?.Stop();
+                        _backlightChannel?.Dispose();
                         _gpioDevice.ClosePin(_backlightPin);
+                    }
                     if (_dcPinId >= 0)
                         _gpioDevice.ClosePin(_dcPinId);
                     if (_shouldDispose)
