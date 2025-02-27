@@ -5,6 +5,7 @@ using Sang.IoT.NV3030B;
 using System.Device.Gpio;
 using System.Device.Gpio.Drivers;
 using System.Device.Spi;
+using System.Drawing;
 
 class Program
 {
@@ -33,7 +34,16 @@ class Program
             Console.WriteLine("Testing basic graphics...");
 
             // 测试基本图形
-            // await TestBasicGraphics(display);
+            display.ClearScreen(Color.Red, true);
+            Task.Delay(10000).Wait();
+            display.FillRect(Color.Blue, 0, 0, 100, 100);
+            display.FillRect(Color.Green, 100, 0, 100, 100);
+
+            display.SendFrame(false);
+
+            Task.Delay(10000).Wait();
+
+            Console.WriteLine("Testing image display...");
 
             // 测试图片显示
             if(args != null && args.Length > 0)
@@ -45,11 +55,13 @@ class Program
                 await TestImage(display);
             }
 
-            Console.WriteLine("All tests completed.");
-
             Task.Delay(10000).Wait();
 
+            Console.WriteLine("Testing bin display...");
+
             await TestBin(display);
+
+            Console.WriteLine("All tests completed.");
 
             Task.Delay(50000).Wait();
         }
