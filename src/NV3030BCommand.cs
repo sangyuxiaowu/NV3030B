@@ -1,6 +1,3 @@
-using System;
-using System.Device.Gpio;
-
 namespace Sang.IoT.NV3030B
 {
     internal enum NV3030BCommand : byte

@@ -1,13 +1,15 @@
-using System.Device.Gpio;
-using System.Device.Spi;
 using Iot.Device.Graphics;
+using System.Device.Gpio;
+using System.Device.Pwm.Drivers;
+using System.Device.Spi;
+using System.Drawing;
 
 namespace Sang.IoT.NV3030B
 {
     /// <summary>
     /// NV3030B LCD Display Driver
     /// </summary>
-    public partial class NV3030B: GraphicDisplay
+    public partial class NV3030B : GraphicDisplay
     {
         private const int DefaultSPIBufferSize = 0x1000;
 
@@ -19,23 +21,27 @@ namespace Sang.IoT.NV3030B
 
         private SpiDevice _spiDevice;
         private GpioController _gpioDevice;
+        private SoftwarePwmChannel? _backlightChannel;
 
-        private byte[] _screenBuffer;
+        private Rgb565[] _screenBuffer;
+        private Rgb565[] _previousBuffer;
 
         private double _fps;
         private DateTimeOffset _lastUpdate;
 
         /// <summary>
-        /// 初始化一个新的 NV3030B 设备实例，该实例将使用 SPI 总线进行通信。
+        /// Initializes new instance of NV3030B device that will communicate using SPI bus.
         /// </summary>
-        /// <param name="spiDevice">用于通信的 SPI 设备。</param>
-        /// <param name="dataCommandPin">用于 DC（数据/命令）的 GPIO 引脚。</param>
-        /// <param name="resetPin">用于 RST（复位）的 GPIO 引脚。</param>
-        /// <param name="backlightPin">用于背光 PWM 控制的引脚。</param>
-        /// <param name="spiBufferSize">SPI 缓冲区大小。</param>
-        /// <param name="gpioController">GPIO 控制器实例。</param>
-        /// <param name="shouldDispose">完成时是否释放 GPIO 控制器。</param>
-        public NV3030B(SpiDevice spiDevice, int dataCommandPin, int resetPin, int backlightPin = -1, 
+        /// <param name="spiDevice">The SPI device used for communication. This Spi device will be displayed along with the NV3030B device.</param>
+        /// <param name="dataCommandPin">The id of the GPIO pin used to control the DC line (data/command). This pin must be provided.</param>
+        /// <param name="resetPin">The id of the GPIO pin used to control the /RESET line (RST). Can be -1 if not connected</param>
+        /// <param name="backlightPin">The pin for turning the backlight on and off, or -1 if not connected.</param>
+        /// <param name="backlight_frequency">The frequency of the backlight pin. The default value is 1000.</param>
+        /// <param name="spiBufferSize">The size of the SPI buffer. If data larger than the buffer is sent then it is split up into multiple transmissions. The default value is 4096.</param>
+        /// <param name="gpioController">The GPIO controller used for communication and controls the the <paramref name="resetPin"/> and the <paramref name="dataCommandPin"/>
+        /// If no Gpio controller is passed in then a default one will be created and disposed when NV3030B device is disposed.</param>
+        /// <param name="shouldDispose">True to dispose the Gpio Controller when done</param>
+        public NV3030B(SpiDevice spiDevice, int dataCommandPin, int resetPin, int backlightPin = -1, int backlight_frequency = 1000,
             int spiBufferSize = DefaultSPIBufferSize, GpioController? gpioController = null, bool shouldDispose = true)
         {
             if (spiBufferSize <= 0)
@@ -63,15 +69,19 @@ namespace Sang.IoT.NV3030B
             if (_backlightPin != -1)
             {
                 _gpioDevice.OpenPin(_backlightPin, PinMode.Output);
+                _backlightChannel = new SoftwarePwmChannel(backlightPin, backlight_frequency);
+                _backlightChannel.Start();
                 SetBacklight(100);
             }
 
             ResetDisplayAsync().Wait();
-            Initialize();
+            InitDisplayParameters();
 
-            _screenBuffer = new byte[ScreenWidth * ScreenHeight * 2];
+            _screenBuffer = new Rgb565[ScreenWidth * ScreenHeight];
+            _previousBuffer = new Rgb565[ScreenWidth * ScreenHeight];
+
             // Clear display
-            SendFrame();
+            SendFrame(true);
         }
 
         /// <summary>
@@ -91,36 +101,39 @@ namespace Sang.IoT.NV3030B
 
         public override PixelFormat NativePixelFormat => PixelFormat.Format16bppRgb565;
 
-        private void Initialize()
+        /// <summary>
+        /// Configure memory and orientation parameters
+        /// </summary>
+        protected virtual void InitDisplayParameters()
         {
-            // 完全按照Python代码的初始化序列
+
             SendCommand(NV3030BCommand.MemoryAccessControl, 0x00);  // 0x36
-            
+
             SendCommand(NV3030BCommand.ConfigurationRegister, 0x06, 0x08);  // 0xfd
-            
+
             SendCommand(NV3030BCommand.DisplaySetting1, 0x07, 0x04);  // 0x61
-            
+
             SendCommand(NV3030BCommand.DisplaySetting2, 0x00, 0x44, 0x45);  // 0x62
-            
+
             SendCommand(NV3030BCommand.DisplaySetting3, 0x41, 0x07, 0x12, 0x12);  // 0x63
-            
+
             SendCommand(NV3030BCommand.DisplaySetting4, 0x37);  // 0x64
-            
+
             SendCommand(NV3030BCommand.PumpSetting1, 0x09, 0x10, 0x21);  // 0x65, Pump1=4.7MHz PUMP1 VSP
-            
+
             SendCommand(NV3030BCommand.PumpSetting2, 0x09, 0x10, 0x21);  // 0x66, pump=2 AVCL
-            
+
             SendCommand(NV3030BCommand.PumpSelect, 0x21, 0x40);  // 0x67, pump_sel
-            
+
             SendCommand(NV3030BCommand.GammaVapVan, 0x90, 0x4c, 0x50, 0x70);  // 0x68, gamma vap/van
-            
+
             SendCommand(NV3030BCommand.FrameRate, 0x0F, 0x02, 0x01);  // 0xb1
-            
+
             SendCommand(NV3030BCommand.LayoutControl, 0x01);  // 0xB4, 01:1dot 00:column
-            
+
             // Porch setting
             SendCommand(NV3030BCommand.PorchSetting, 0x02, 0x02, 0x0a, 0x14);  // 0xB5
-            
+
             SendCommand(NV3030BCommand.GateControl, 0x04, 0x01, 0x9f, 0x00, 0x02);  // 0xB6
 
             // Gamma settings
@@ -147,69 +160,100 @@ namespace Sang.IoT.NV3030B
 
             // Final configurations
             SendCommand(NV3030BCommand.ConfigurationRegister, 0xfa, 0xfc);  // 0xfd
-            
+
             // 设置色彩模式为16位RGB565
             SendCommand(NV3030BCommand.ColMod, 0x55);  // 0x3a, 16-bit/pixel
-            
+
             SendCommand(NV3030BCommand.TearingEffectLine, 0x00);  // 0x35
-            
+
             SendCommand(NV3030BCommand.NormalDisplay);  // 0x21
-            
+
             SendCommand(NV3030BCommand.SleepOut);  // 0x11
-            
+
             SendCommand(NV3030BCommand.DisplayOn);  // 0x29
         }
 
+
         /// <summary>
-        /// Set display window for drawing
+        /// This device supports standard 32 bit formats as input
         /// </summary>
-        private void SetWindow(int x0, int y0, int x1, int y1)
+        /// <param name="format">The format to query</param>
+        /// <returns>True if it is supported, false if not</returns>
+        public override bool CanConvertFromPixelFormat(PixelFormat format)
         {
-            y0 += 20;
-            y1 += 20;
-            
-            SendCommand(NV3030BCommand.ColumnAddressSet);
-            SendData(new byte[] { (byte)(x0 >> 8), (byte)x0, (byte)(x1 >> 8), (byte)x1 });
-            
-            SendCommand(NV3030BCommand.PageAddressSet);
-            SendData(new byte[] { (byte)(y0 >> 8), (byte)y0, (byte)(y1 >> 8), (byte)y1 });
-            
-            SendCommand(NV3030BCommand.MemoryWrite);
+            return format == PixelFormat.Format32bppXrgb || format == PixelFormat.Format32bppArgb;
         }
-        
+
         /// <summary>
-        /// Send command to display
+        /// Fill rectangle to the specified color
         /// </summary>
-        private void SendCommand(NV3030BCommand cmd, params byte[] data)
+        /// <param name="color">The color to fill the rectangle with.</param>
+        /// <param name="x">The x co-ordinate of the point to start the rectangle at in pixels.</param>
+        /// <param name="y">The y co-ordinate of the point to start the rectangle at in pixels.</param>
+        /// <param name="w">The width of the rectangle in pixels.</param>
+        /// <param name="h">The height of the rectangle in pixels.</param>
+        public void FillRect(Color color, int x, int y, int w, int h)
         {
-            Console.WriteLine($"CMD: 0x{(byte)cmd:X2}");
-            _gpioDevice.Write(_dcPinId, PinValue.Low);
-            _spiDevice.Write(new[] { (byte)cmd });
-            
-            if (data.Length > 0)
+            FillRect(color, x, y, w, h, false);
+        }
+
+        /// <summary>
+        /// Fill rectangle to the specified color
+        /// </summary>
+        /// <param name="color">The color to fill the rectangle with.</param>
+        /// <param name="x">The x co-ordinate of the point to start the rectangle at in pixels.</param>
+        /// <param name="y">The y co-ordinate of the point to start the rectangle at in pixels.</param>
+        /// <param name="w">The width of the rectangle in pixels.</param>
+        /// <param name="h">The height of the rectangle in pixels.</param>
+        /// <param name="doRefresh">True to immediately update the screen, false to only update the back buffer</param>
+        private void FillRect(Color color, int x, int y, int w, int h, bool doRefresh)
+        {
+            Span<byte> colourBytes = stackalloc byte[2]; // create a short span that holds the colour data to be sent to the display
+
+            // set the colourbyte array to represent the fill colour
+            var c = Rgb565.FromRgba32(color);
+
+            // set the pixels in the array representing the raw data to be sent to the display
+            // to the fill color
+            for (int j = y; j < y + h; j++)
             {
-                _gpioDevice.Write(_dcPinId, PinValue.High);
-                _spiDevice.Write(data);
-                Console.WriteLine($"Data: {BitConverter.ToString(data)}");
+                for (int i = x; i < x + w; i++)
+                {
+                    _screenBuffer[i + j * ScreenWidth] = c;
+                }
+            }
+
+            if (doRefresh)
+            {
+                SendFrame(false);
             }
         }
 
         /// <summary>
-        /// Send data to display
+        /// Clears the screen to a specific color
         /// </summary>
-        private void SendData(byte[] data)
+        /// <param name="color">The color to clear the screen to</param>
+        /// <param name="doRefresh">Immediately force an update of the screen. If false, only the backbuffer is cleared.</param>
+        public void ClearScreen(Color color, bool doRefresh)
         {
-            if (data.Length > 32)
-            {
-                Console.WriteLine($"Data length: {data.Length} bytes");
-                Console.WriteLine($"First 32 bytes: {BitConverter.ToString(data, 0, Math.Min(32, data.Length))}");
-            }
-            else
-            {
-                Console.WriteLine($"Data: {BitConverter.ToString(data)}");
-            }
-            _gpioDevice.Write(_dcPinId, PinValue.High);
-            _spiDevice.Write(data);
+            FillRect(color, 0, 0, ScreenWidth, ScreenHeight, doRefresh);
+        }
+
+        /// <summary>
+        /// Clears the screen to black
+        /// </summary>
+        /// <param name="doRefresh">Immediately force an update of the screen. If false, only the backbuffer is cleared.</param>
+        public void ClearScreen(bool doRefresh)
+        {
+            FillRect(Color.FromArgb(0, 0, 0), 0, 0, ScreenWidth, ScreenHeight, doRefresh);
+        }
+
+        /// <summary>
+        /// Immediately clears the screen to black.
+        /// </summary>
+        public override void ClearScreen()
+        {
+            ClearScreen(true);
         }
 
         /// <summary>
@@ -220,55 +264,76 @@ namespace Sang.IoT.NV3030B
             if (_resetPinId < 0) return;
 
             _gpioDevice.Write(_resetPinId, PinValue.High);
-            await Task.Delay(10);
+            await Task.Delay(10).ConfigureAwait(false);
             _gpioDevice.Write(_resetPinId, PinValue.Low);
-            await Task.Delay(10);
+            await Task.Delay(10).ConfigureAwait(false);
             _gpioDevice.Write(_resetPinId, PinValue.High);
-            await Task.Delay(120);
+            await Task.Delay(10).ConfigureAwait(false);
         }
+
 
         /// <summary>
         /// Set backlight brightness (0-100)
         /// </summary>
         public void SetBacklight(int brightness)
         {
-            if (_backlightPin == -1)
+            if (_backlightChannel is null)
                 throw new InvalidOperationException("Backlight pin not configured");
 
-            brightness = Math.Clamp(brightness, 0, 100);
-            _gpioDevice.Write(_backlightPin, brightness > 0 ? PinValue.High : PinValue.Low);
+            if (brightness < 0 || brightness > 100)
+                throw new ArgumentOutOfRangeException(nameof(brightness), "Brightness must be between 0 and 100");
+
+            double dutyCycle = brightness / 100.0;
+            _backlightChannel.DutyCycle = dutyCycle;
         }
 
-        // Implementation of GraphicDisplay abstract methods
-        public void ClearScreen()
+
+        /// <summary>
+        /// Set display window for drawing
+        /// </summary>
+        private void SetWindow(int x0, int y0, int x1, int y1)
         {
-            Array.Clear(_screenBuffer, 0, _screenBuffer.Length);
-            SendFrame();
+            y0 += 20;
+            y1 += 20;
+
+            SendCommand(NV3030BCommand.ColumnAddressSet);
+            SendData(new byte[] { (byte)(x0 >> 8), (byte)x0, (byte)(x1 >> 8), (byte)x1 });
+
+            SendCommand(NV3030BCommand.PageAddressSet);
+            SendData(new byte[] { (byte)(y0 >> 8), (byte)y0, (byte)(y1 >> 8), (byte)y1 });
+
+            SendCommand(NV3030BCommand.MemoryWrite);
         }
 
         /// <summary>
-        /// Send frame buffer to display
+        /// Send a command to the the display controller along with associated parameters.
         /// </summary>
-        public void SendFrame()
+        /// <param name="command">Command to send.</param>
+        /// <param name="commandParameters">parameteters for the command to be sent</param>
+        internal void SendCommand(NV3030BCommand command, params byte[] commandParameters)
         {
-            SetWindow(0, 0, ScreenWidth, ScreenHeight);
-            _gpioDevice.Write(_dcPinId, PinValue.High);
-
-            // 使用固定大小块发送数据
-            for (int i = 0; i < _screenBuffer.Length; i += _spiBufferSize)
-            {
-                int length = Math.Min(_spiBufferSize, _screenBuffer.Length - i);
-                var chunk = _screenBuffer.AsSpan(i, length);
-                _spiDevice.Write(chunk);
-                // 打印第一块数据用于调试
-                if (i == 0)
-                {
-                    Console.WriteLine($"First chunk data: {BitConverter.ToString(chunk.ToArray())}");
-                }
-            }
-            UpdateFps();
+            SendCommand(command, commandParameters.AsSpan());
         }
 
+        /// <summary>
+        /// Send a command to the the display controller along with parameters.
+        /// </summary>
+        /// <param name="command">Command to send.</param>
+        /// <param name="data">Span to send as parameters for the command.</param>
+        internal void SendCommand(NV3030BCommand command, Span<byte> data)
+        {
+            Span<byte> commandSpan = stackalloc byte[]
+            {
+                (byte)command
+            };
+
+            SendSPI(commandSpan, true);
+
+            if (data != null && data.Length > 0)
+            {
+                SendSPI(data);
+            }
+        }
 
         /// <summary>
         /// Send data to the display controller.

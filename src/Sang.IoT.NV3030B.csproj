@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <PackageReference Include="Iot.Device.Bindings.SkiaSharpAdapter" Version="3.2.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
     <PackageReference Include="System.Device.Gpio" Version="3.2.0" />
   </ItemGroup>
 
