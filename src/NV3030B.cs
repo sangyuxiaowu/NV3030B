@@ -1,14 +1,13 @@
 using System.Device.Gpio;
 using System.Device.Spi;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using Iot.Device.Graphics;
 
 namespace Sang.IoT.NV3030B
 {
     /// <summary>
     /// NV3030B LCD Display Driver
     /// </summary>
-    public partial class NV3030B: IDisposable
+    public partial class NV3030B: GraphicDisplay
     {
         private const int DefaultSPIBufferSize = 0x1000;
 
@@ -78,17 +77,19 @@ namespace Sang.IoT.NV3030B
         /// <summary>
         /// Screen width in pixels
         /// </summary>
-        public virtual int ScreenWidth => 240;
+        public override int ScreenWidth => 240;
 
         /// <summary>
         /// Screen height in pixels
         /// </summary>
-        public virtual int ScreenHeight => 280;
+        public override int ScreenHeight => 280;
 
         /// <summary>
         /// Current FPS value
         /// </summary>
         public double Fps => _fps;
+
+        public override PixelFormat NativePixelFormat => PixelFormat.Format16bppRgb565;
 
         private void Initialize()
         {
@@ -268,47 +269,52 @@ namespace Sang.IoT.NV3030B
             UpdateFps();
         }
 
-        public void ShowImage(Image<Bgr24> image)
+
+        /// <summary>
+        /// Send data to the display controller.
+        /// </summary>
+        /// <param name="data">The data to send to the display controller.</param>
+        private void SendData(Span<byte> data)
         {
-            int imwidth = image.Width;
-            int imheight = image.Height;
-            if (imwidth > ScreenWidth || imheight > ScreenHeight)
-            {
-                throw new ArgumentException("Image dimensions exceed screen dimensions.");
-            }
-
-            var pix = new byte[imheight * imwidth * 2];
-            for (int y = 0; y < imheight; y++)
-            {
-            for (int x = 0; x < imwidth; x++)
-            {
-                var color = image[x, y];
-                int index = (y * imwidth + x) * 2;
-                pix[index] = (byte)((color.R & 0xF8) | (color.G >> 5));
-                pix[index + 1] = (byte)(((color.G << 3) & 0xE0) | (color.B >> 3));
-            }
-            }
-
-            Array.Clear(_screenBuffer, 0, _screenBuffer.Length);
-            Array.Copy(pix, _screenBuffer, pix.Length);
-            SendFrame();
+            SendSPI(data, blnIsCommand: false);
         }
 
-        private void UpdateFps()
+        /// <summary>
+        /// Write a block of data to the SPI device
+        /// </summary>
+        /// <param name="data">The data to be sent to the SPI device</param>
+        /// <param name="blnIsCommand">A flag indicating that the data is really a command when true or data when false.</param>
+        private void SendSPI(Span<byte> data, bool blnIsCommand = false)
         {
-            var now = DateTimeOffset.UtcNow;
-            var ts = now - _lastUpdate;
-            if (ts <= TimeSpan.FromMilliseconds(1))
+            int index = 0;
+            int len;
+
+            // set the DC pin to indicate if the data being sent to the display is DATA or COMMAND bytes.
+            _gpioDevice.Write(_dcPinId, blnIsCommand ? PinValue.Low : PinValue.High);
+
+            // write the array of bytes to the display. (in chunks of SPI Buffer Size)
+            do
             {
-                ts = TimeSpan.FromMilliseconds(1);
+                // calculate the amount of spi data to send in this chunk
+                len = Math.Min(data.Length - index, _spiBufferSize);
+                // send the slice of data off set by the index and of length len.
+                _spiDevice.Write(data.Slice(index, len));
+                // add the length just sent to the index
+                index += len;
             }
-            _fps = 1.0 / ts.TotalSeconds;
-            _lastUpdate = now;
+            while (index < data.Length); // repeat until all data sent.
         }
 
-        public void Dispose()
+        /// <inheritdoc />
+        public override BitmapImage GetBackBufferCompatibleImage()
         {
-            if (_shouldDispose)
+            return BitmapImage.CreateBitmap(ScreenWidth, ScreenHeight, PixelFormat.Format32bppArgb);
+        }
+
+        /// <inheritdoc />
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
             {
                 if (_gpioDevice != null)
                 {
