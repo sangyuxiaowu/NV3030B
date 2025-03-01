@@ -152,7 +152,7 @@ namespace Sang.IoT.NV3030B
         /// <remarks>This directly sends the data, circumventing the screen buffer</remarks>
         public void SendBitmapPixelData(Span<byte> pixelData, Rectangle destinationRect)
         {
-            SetWindow(destinationRect.X, destinationRect.Y, (destinationRect.Right - 1), (destinationRect.Bottom - 1));   // specifiy a location for the rows and columns on the display where the data is to be written
+            SetWindow(destinationRect.X, destinationRect.Y, destinationRect.Right, destinationRect.Bottom);
             SendData(pixelData);
             UpdateFps();
         }
