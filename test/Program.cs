@@ -2,8 +2,6 @@
 using Iot.Device.Graphics;
 using Iot.Device.Graphics.SkiaSharpAdapter;
 using Sang.IoT.NV3030B;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using System.Device.Gpio;
 using System.Device.Gpio.Drivers;
 using System.Device.Spi;
@@ -37,12 +35,18 @@ class Program
             // 测试基本图形
             display.ClearScreen(System.Drawing.Color.Red, true);
             Task.Delay(10000).Wait();
+
+            Console.WriteLine("Testing fill rectangle...");
             display.FillRect(System.Drawing.Color.Blue, 0, 0, 100, 100);
             display.FillRect(System.Drawing.Color.Green, 100, 0, 100, 100);
-
             display.SendFrame(false);
 
             Task.Delay(10000).Wait();
+
+            Console.WriteLine("Testing clear screen...");
+            display.ClearScreen(true);
+            // fps
+            Console.WriteLine("fps: " + display.Fps);
 
             Console.WriteLine("Testing image display...");
 
@@ -55,20 +59,23 @@ class Program
             {
                 await TestImage(display);
             }
+            Task.Delay(10000).Wait();
 
-            //Task.Delay(10000).Wait();
-            //
-            //Console.WriteLine("Testing bin display...");
-            //
-            //await TestBin(display);
-            //
-            //Task.Delay(10000).Wait();
-            //
-            //Console.WriteLine("Testing ImageSharp display...");
-            //
-            //await TestImageSharp(display);
-            //
-            //Console.WriteLine("All tests completed.");
+            // 亮度
+            Console.WriteLine("Testing backlight...");
+            display.SetBacklight(20);
+            Task.Delay(500).Wait();
+            display.SetBacklight(50);
+            Task.Delay(500).Wait();
+            display.SetBacklight(100);
+
+            Task.Delay(10000).Wait();
+            
+            Console.WriteLine("Testing bin display...");
+
+            await TestBin(display);
+
+            Console.WriteLine("All tests completed.");
 
             Task.Delay(50000).Wait();
         }
@@ -110,30 +117,4 @@ class Program
             Console.WriteLine($"Failed to load or display image: {ex.Message}");
         }
     }
-
-    private static async Task TestImageSharp(NV3030B display)
-    {
-
-        try
-        {
-            using var image = SixLabors.ImageSharp.Image.Load<Bgra32>("LCD_1inch5.jpg");
-            using Image<Bgr24> converted = image.CloneAs<Bgr24>();
-            var pix = new byte[display.ScreenHeight * display.ScreenWidth * 2];
-            for (int y = 0; y < display.ScreenHeight; y++)
-            {
-                for (int x = 0; x < display.ScreenWidth; x++)
-                {
-                    var color = image[x, y];
-                    pix[(y * display.ScreenWidth + x) * 2] = (byte)((color.R & 0xF8) | (color.G >> 5));
-                    pix[(y * display.ScreenWidth + x) * 2 + 1] = (byte)(((color.G << 3) & 0xE0) | (color.B >> 3));
-                }
-            }
-            display.SendBitmapPixelData(pix, new System.Drawing.Rectangle(0, 0, display.ScreenWidth, display.ScreenHeight));
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to load or display image: {ex.Message}");
-        }
-    }
-
 }
