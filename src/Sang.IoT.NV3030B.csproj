@@ -9,10 +9,10 @@
 	  <PackageReadmeFile>README.md</PackageReadmeFile>
 	  <RepositoryUrl>https://github.com/sangyuxiaowu/NV3030B</RepositoryUrl>
 	  <RepositoryType>git</RepositoryType>
-	  <PackageTags>dotnet;iot;ssd1306;i2c</PackageTags>
+	  <PackageTags>dotnet;iot;NV3030B;spi</PackageTags>
 	  <PackageIcon>logo.png</PackageIcon>
 	  <PackageProjectUrl>https://github.com/sangyuxiaowu/NV3030B</PackageProjectUrl>
-	  <Description>This is a library for the NV3030B LCD controller.	  </Description>
+	  <Description>This is a library for the NV3030B LCD controller.</Description>
 	  <Version>1.0.1</Version>
 	  <Authors>SangSQ(桑世强)</Authors>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
