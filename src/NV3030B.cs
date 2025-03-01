@@ -297,10 +297,10 @@ namespace Sang.IoT.NV3030B
             y1 += 20;
 
             SendCommand(NV3030BCommand.ColumnAddressSet);
-            SendData(new byte[] { (byte)(x0 >> 8), (byte)x0, (byte)(x1 >> 8), (byte)x1 });
+            SendData(new byte[] { (byte)(x0 >> 8), (byte)x0, (byte)((x1 - 1) >> 8), (byte)(x1 - 1) });
 
             SendCommand(NV3030BCommand.PageAddressSet);
-            SendData(new byte[] { (byte)(y0 >> 8), (byte)y0, (byte)(y1 >> 8), (byte)y1 });
+            SendData(new byte[] { (byte)(y0 >> 8), (byte)y0, (byte)((y1 - 1) >> 8), (byte)(y1 - 1) });
 
             SendCommand(NV3030BCommand.MemoryWrite);
         }
