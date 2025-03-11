@@ -8,10 +8,15 @@ using System.Device.Spi;
 
 class Program
 {
+#if LUCK_FOX
+    const int pinID_DC = 32;
+    const int pinID_Reset = 33;
+    const int pinID_BL = 40;
+#else
     const int pinID_DC = 25;
     const int pinID_Reset = 27;
     const int pinID_BL = 18;
-
+#endif
     static async Task Main(string[] args)
     {
         SkiaSharpAdapter.Register();
@@ -26,10 +31,13 @@ class Program
                 DataBitLength = 8,
                 ClockFrequency = 40_000_000
             });
-
+#if LUCK_FOX
+            // LUCK_FOX 需要使用 SysFsDriver 驱动 GPIO
             var gpioController = new GpioController(PinNumberingScheme.Logical, new SysFsDriver());
+            using var display = new NV3030B(displaySPI, pinID_DC, pinID_Reset, pinID_BL, gpioController: gpioController);
+#else
             using var display = new NV3030B(displaySPI, pinID_DC, pinID_Reset, pinID_BL);
-
+#endif
             Console.WriteLine("Testing basic graphics...");
 
             // 测试基本图形
@@ -70,14 +78,21 @@ class Program
             display.SetBacklight(100);
 
             Task.Delay(10000).Wait();
-            
+
+            // 局部刷新
+            Console.WriteLine("Testing partial update...");
+            display.FillRect(System.Drawing.Color.Green, 100, 0, 100, 100);
+            display.SendFrame(false);
+
+            Task.Delay(10000).Wait();
+
             Console.WriteLine("Testing bin display...");
 
             await TestBin(display);
 
             Console.WriteLine("All tests completed.");
 
-            Task.Delay(50000).Wait();
+            Task.Delay(20000).Wait();
         }
         catch (Exception ex)
         {
