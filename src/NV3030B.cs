@@ -69,7 +69,7 @@ namespace Sang.IoT.NV3030B
             if (_backlightPin != -1)
             {
                 _gpioDevice.OpenPin(_backlightPin, PinMode.Output);
-                _backlightChannel = new SoftwarePwmChannel(backlightPin, backlight_frequency);
+                _backlightChannel = new SoftwarePwmChannel(backlightPin, backlight_frequency,controller: _gpioDevice);
                 _backlightChannel.Start();
                 SetBacklight(100);
             }
