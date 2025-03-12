@@ -38,18 +38,38 @@ class Program
 #else
             using var display = new NV3030B(displaySPI, pinID_DC, pinID_Reset, pinID_BL);
 #endif
+
+            // 颜色测试
+            Console.WriteLine("Testing basic colors...");
+            display.ClearScreen(System.Drawing.Color.Red, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.Green, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.Blue, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.White, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.Black, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.Yellow, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.Cyan, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.Magenta, true);
+            Task.Delay(200).Wait();
+            display.ClearScreen(System.Drawing.Color.Gray, true);
+            Task.Delay(200).Wait();
+
             Console.WriteLine("Testing basic graphics...");
 
             // 测试基本图形
             display.ClearScreen(System.Drawing.Color.Red, true);
-            Task.Delay(10000).Wait();
-
             Console.WriteLine("Testing fill rectangle...");
             display.FillRect(System.Drawing.Color.Blue, 0, 0, 100, 100);
             display.FillRect(System.Drawing.Color.Green, 100, 0, 100, 100);
             display.SendFrame(false);
 
-            Task.Delay(10000).Wait();
+            Task.Delay(5000).Wait();
 
             Console.WriteLine("Testing clear screen...");
             display.ClearScreen(true);
@@ -67,7 +87,7 @@ class Program
             {
                 await TestImage(display);
             }
-            Task.Delay(10000).Wait();
+            Task.Delay(5000).Wait();
 
             // 亮度
             Console.WriteLine("Testing backlight...");
@@ -77,16 +97,16 @@ class Program
             Task.Delay(500).Wait();
             display.SetBacklight(100);
 
-            Task.Delay(10000).Wait();
+            Task.Delay(5000).Wait();
 
             // 局部刷新
             Console.WriteLine("Testing partial update...");
-            display.FillRect(System.Drawing.Color.Green, 100, 0, 100, 100);
+            display.FillRect(System.Drawing.Color.Azure, 100, 0, 100, 100);
             display.SendFrame(false);
 
             Console.WriteLine("All tests completed.");
 
-            Task.Delay(20000).Wait();
+            Task.Delay(2000).Wait();
         }
         catch (Exception ex)
         {
