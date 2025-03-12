@@ -84,12 +84,6 @@ class Program
             display.FillRect(System.Drawing.Color.Green, 100, 0, 100, 100);
             display.SendFrame(false);
 
-            Task.Delay(10000).Wait();
-
-            Console.WriteLine("Testing bin display...");
-
-            await TestBin(display);
-
             Console.WriteLine("All tests completed.");
 
             Task.Delay(20000).Wait();
@@ -110,22 +104,6 @@ class Program
             using var image = BitmapImage.CreateFromFile(file);
             display.DrawBitmap(image);
 
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to load or display image: {ex.Message}");
-        }
-    }
-    private static async Task TestBin(NV3030B display)
-    {
-
-        try
-        {
-            // 读取bin文件
-            using var fs = new FileStream("pix.bin", FileMode.Open);
-            byte[] buffer = new byte[fs.Length];
-            fs.Read(buffer, 0, buffer.Length);
-            display.SendBitmapPixelData(buffer, new System.Drawing.Rectangle(0, 0, 240, 280));
         }
         catch (Exception ex)
         {
