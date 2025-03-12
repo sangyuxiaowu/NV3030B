@@ -1,15 +1,12 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-
-using System.Drawing;
+﻿using System.Drawing;
 
 namespace Sang.IoT.NV3030B
 {
     /// <summary>
-    /// This is the image format used by the Ili934X internally. It's similar to the (meanwhile otherwise rather obsolete) 16-bit RGB format with
-    /// 5 bits for red, 6 bits for green and 5 bits for blue.
+    /// Rgb565 结构表示一个 16 位 RGB 颜色
+    /// 其中红色 5 位，绿色 6 位，蓝色 5 位。
     /// </summary>
-    internal struct Rgb565 : IEquatable<Rgb565>
+    public struct Rgb565 : IEquatable<Rgb565>
     {
         private ushort _value;
 
@@ -24,108 +21,107 @@ namespace Sang.IoT.NV3030B
             InitFrom(r, g, b);
         }
 
+        /// <summary>
+        /// 获取红色分量 (0-255)
+        /// </summary>
         public int R
         {
             get
             {
-                // Ensure full black is a possible result
-                int lowByte = _value & 0xF8;
-                if (lowByte == 0)
-                {
-                    return 0;
-                }
-
-                return lowByte | 0x7;
+                int value = (_value & 0xF8);
+                return value == 0 ? 0 : value | 0x7;
             }
         }
 
+        /// <summary>
+        /// 获取绿色分量 (0-255)
+        /// </summary>
         public int G
         {
             get
             {
-                int gbyte = ((Swap(_value) & 0x7E0) >> 3);
-                if (gbyte == 0)
-                {
-                    return 0;
-                }
-
-                return gbyte | 0x3;
+                int value = ((_value & 0x7E0) >> 5);
+                return value == 0 ? 0 : value | 0x3;
             }
         }
 
+        /// <summary>
+        /// 获取蓝色分量 (0-255)
+        /// </summary>
         public int B
         {
             get
             {
-                int bbyte = (_value >> 5) & 0xF8;
-                if (bbyte == 0)
-                {
-                    return 0;
-                }
-
-                return bbyte | 0x7;
+                int value = ((_value >> 11) & 0x1F) << 3;
+                return value == 0 ? 0 : value | 0x7;
             }
         }
 
         private void InitFrom(ushort r, ushort g, ushort b)
         {
-            // get the top 5 MSB of the blue or red value
-            UInt16 retval = (UInt16)(r >> 3);
-            // shift right to make room for the green Value
-            retval <<= 6;
-            // combine with the 6 MSB if the green value
-            retval |= (UInt16)(g >> 2);
-            // shift right to make room for the red or blue Value
-            retval <<= 5;
-            // combine with the 6 MSB if the red or blue value
-            retval |= (UInt16)(b >> 3);
-
-            _value = Swap(retval);
+            _value = PackRgb(r, g, b);
         }
 
         /// <summary>
-        /// Convert a color structure to a byte tuple representing the colour in 565 format.
+        /// 将 RGB 值打包为 RGB565 格式
         /// </summary>
-        /// <param name="color">The color to be converted.</param>
-        /// <returns>
-        /// This method returns the low byte and the high byte of the 16bit value representing RGB565 or BGR565 value
-        ///
-        /// byte    11111111 00000000
-        /// bit     76543210 76543210
-        ///
-        /// For ColorSequence.RGB (inversed!, the LSB is the top byte)
-        ///         GGGBBBBB RRRRRGGG
-        ///         43210543 21043210
-        /// </returns>
-        public static Rgb565 FromRgba32(Color color)
+        private static ushort PackRgb(int r, int g, int b)
         {
-            // get the top 5 MSB of the blue or red value
-            UInt16 retval = (UInt16)(color.R >> 3);
-            // shift right to make room for the green Value
+            // 获取红色值的高5位
+            UInt16 retval = (UInt16)(r >> 3);
+            // 左移为绿色值腾出空间
             retval <<= 6;
-            // combine with the 6 MSB if the green value
-            retval |= (UInt16)(color.G >> 2);
-            // shift right to make room for the red or blue Value
+            // 合并绿色值的高6位
+            retval |= (UInt16)(g >> 2);
+            // 左移为蓝色值腾出空间
             retval <<= 5;
-            // combine with the 6 MSB if the red or blue value
-            retval |= (UInt16)(color.B >> 3);
+            // 合并蓝色值的高5位
+            retval |= (UInt16)(b >> 3);
 
-            return new Rgb565(Swap(retval));
+            return Swap(retval);
         }
 
-        private static ushort Swap(ushort val) => (ushort)((val >> 8) | (val << 8));
+        /// <summary>
+        /// 将颜色结构转换为表示 565 格式颜色的 Rgb565 结构
+        /// </summary>
+        /// <param name="color">要转换的颜色</param>
+        public static Rgb565 FromRgba32(Color color)
+        {
+            return new Rgb565(PackRgb(color.R, color.G, color.B));
+        }
+
+        /// <summary>
+        /// 从整数 RGB 值创建 Rgb565 实例
+        /// </summary>
+        public static Rgb565 FromRgba32(int r, int g, int b)
+        {
+            return new Rgb565(PackRgb(r, g, b));
+        }
+
+        /// <summary>
+        /// 交换字节顺序 (小端/大端转换)
+        /// </summary>
+        private static ushort Swap(ushort val)
+        {
+            return (ushort)((val >> 8) | (val << 8));
+        }
 
         public ushort PackedValue
         {
-            get
-            {
-                return _value;
-            }
-            set
-            {
-                _value = value;
-            }
+            get => _value;
+            set => _value = value;
         }
+
+        // 添加常用颜色的静态属性
+        public static Rgb565 Black => new Rgb565(0);
+        public static Rgb565 White => FromRgba32(Color.White);
+        public static Rgb565 Red => FromRgba32(Color.Red);
+        public static Rgb565 Green => FromRgba32(Color.Green);
+        public static Rgb565 Blue => FromRgba32(Color.Blue);
+        public static Rgb565 Yellow => FromRgba32(Color.Yellow);
+        public static Rgb565 Cyan => FromRgba32(Color.Cyan);
+        public static Rgb565 Magenta => FromRgba32(Color.Magenta);
+        public static Rgb565 Gray => FromRgba32(Color.Gray);
 
         public bool Equals(Rgb565 other)
         {
@@ -153,13 +149,12 @@ namespace Sang.IoT.NV3030B
         }
 
         /// <summary>
-        /// Returns true if the two colors are almost equal
+        /// 如果两个颜色几乎相等，则返回 true
         /// </summary>
-        /// <param name="a">First color</param>
-        /// <param name="b">Second color</param>
-        /// <param name="delta">The allowed delta, in visible bits</param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
+        /// <param name="a">第一个颜色</param>
+        /// <param name="b">第二个颜色</param>
+        /// <param name="delta">允许的差异，以可见位为单位</param>
+        /// <returns>颜色是否几乎相等</returns>
         public static bool AlmostEqual(Rgb565 a, Rgb565 b, int delta)
         {
             if (a.PackedValue == b.PackedValue)
@@ -185,9 +180,20 @@ namespace Sang.IoT.NV3030B
             return true;
         }
 
+        /// <summary>
+        /// 将 Rgb565 转换为 System.Drawing.Color
+        /// </summary>
         public Color ToColor()
         {
             return Color.FromArgb(255, R, G, B);
+        }
+
+        /// <summary>
+        /// 返回此颜色的字符串表示
+        /// </summary>
+        public override string ToString()
+        {
+            return $"RGB565: R={R}, G={G}, B={B} (0x{PackedValue:X4})";
         }
     }
 }
