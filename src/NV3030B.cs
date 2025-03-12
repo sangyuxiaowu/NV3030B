@@ -69,7 +69,7 @@ namespace Sang.IoT.NV3030B
             if (_backlightPin != -1)
             {
                 _gpioDevice.OpenPin(_backlightPin, PinMode.Output);
-                _backlightChannel = new SoftwarePwmChannel(backlightPin, backlight_frequency,controller: _gpioDevice);
+                _backlightChannel = new SoftwarePwmChannel(backlightPin, backlight_frequency, controller: _gpioDevice);
                 _backlightChannel.Start();
                 SetBacklight(100);
             }
@@ -319,16 +319,14 @@ namespace Sang.IoT.NV3030B
             {
                 if (_gpioDevice != null)
                 {
-                    if (_resetPinId >= 0)
-                        _gpioDevice.ClosePin(_resetPinId);
+                    ClosePin(_resetPinId);
                     if (_backlightPin >= 0)
                     {
                         _backlightChannel?.Stop();
                         _backlightChannel?.Dispose();
-                        _gpioDevice.ClosePin(_backlightPin);
+                        ClosePin(_backlightPin);
                     }
-                    if (_dcPinId >= 0)
-                        _gpioDevice.ClosePin(_dcPinId);
+                    ClosePin(_dcPinId);
                     if (_shouldDispose)
                         _gpioDevice.Dispose();
                     _gpioDevice = null;
@@ -336,6 +334,20 @@ namespace Sang.IoT.NV3030B
 
                 _spiDevice?.Dispose();
                 _spiDevice = null;
+            }
+        }
+
+        private void ClosePin(int pinId)
+        {
+            try
+            {
+                if (pinId >= 0 && _gpioDevice.IsPinOpen(pinId))
+                {
+                    _gpioDevice.ClosePin(pinId);
+                }
+            }
+            catch(ObjectDisposedException) {
+                // ignore exceptions on close
             }
         }
     }
