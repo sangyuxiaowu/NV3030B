@@ -13,7 +13,7 @@
 	  <PackageIcon>logo.png</PackageIcon>
 	  <PackageProjectUrl>https://github.com/sangyuxiaowu/NV3030B</PackageProjectUrl>
 	  <Description>This is a library for the NV3030B LCD controller.</Description>
-	  <Version>1.0.2</Version>
+	  <Version>1.0.3</Version>
 	  <Authors>SangSQ(桑世强)</Authors>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
