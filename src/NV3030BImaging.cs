@@ -86,43 +86,30 @@ namespace Sang.IoT.NV3030B
             }
             else
             {
-                int topRow = 0;
-                int bottomRow = ScreenHeight;
+                int topRow = -1;
+                int bottomRow = -1;
                 int w = ScreenWidth;
+
                 for (int y = 0; y < ScreenHeight; y++)
                 {
                     for (int x = 0; x < w; x++)
                     {
                         if (!Rgb565.AlmostEqual(_screenBuffer[x + y * w], _previousBuffer[x + y * w], 2))
                         {
-                            topRow = y;
-                            goto reverse;
-                        }
-                    }
-                }
-
-                // if we get here, there were no screen changes
-                UpdateFps();
-                return;
-
-            reverse:
-
-                for (int y = ScreenHeight - 1; y >= topRow; y--)
-                {
-                    for (int x = 0; x < w; x++)
-                    {
-                        if (!Rgb565.AlmostEqual(_screenBuffer[x + y * w], _previousBuffer[x + y * w], 2))
-                        {
+                            if (topRow == -1) topRow = y;
                             bottomRow = y;
-                            goto end;
                         }
                     }
                 }
 
-            end:
+                if (topRow == -1 || bottomRow == -1)
+                {
+                    // No changes detected
+                    UpdateFps();
+                    return;
+                }
 
                 SetWindow(0, topRow, w, bottomRow);
-                // Send the given number of rows (+1, because including the end row)
                 var partialSpan = MemoryMarshal.Cast<Rgb565, byte>(_screenBuffer.AsSpan().Slice(topRow * w, (bottomRow - topRow + 1) * w));
                 SendSPI(partialSpan);
             }
