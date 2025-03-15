@@ -1,5 +1,4 @@
-﻿
-using Iot.Device.Graphics;
+﻿using Iot.Device.Graphics;
 using Iot.Device.Graphics.SkiaSharpAdapter;
 using Sang.IoT.NV3030B;
 using System.Device.Gpio;
@@ -17,6 +16,8 @@ class Program
     const int pinID_Reset = 27;
     const int pinID_BL = 18;
 #endif
+
+    const int testAwait = 2000;
     static async Task Main(string[] args)
     {
         SkiaSharpAdapter.Register();
@@ -40,43 +41,10 @@ class Program
 #endif
 
             // 颜色测试
-            Console.WriteLine("Testing basic colors...");
-            display.ClearScreen(System.Drawing.Color.Red, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.Green, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.Blue, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.White, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.Black, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.Yellow, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.Cyan, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.Magenta, true);
-            Task.Delay(200).Wait();
-            display.ClearScreen(System.Drawing.Color.Gray, true);
-            Task.Delay(200).Wait();
-
-            Console.WriteLine("Testing basic graphics...");
+            await TestBasicColors(display);
 
             // 测试基本图形
-            display.ClearScreen(System.Drawing.Color.Red, true);
-            Console.WriteLine("Testing fill rectangle...");
-            display.FillRect(System.Drawing.Color.Blue, 0, 0, 100, 100);
-            display.FillRect(System.Drawing.Color.Green, 100, 0, 100, 100);
-            display.SendFrame(false);
-
-            Task.Delay(5000).Wait();
-
-            Console.WriteLine("Testing clear screen...");
-            display.ClearScreen(true);
-            // fps
-            Console.WriteLine("fps: " + display.Fps);
-
-            Console.WriteLine("Testing image display...");
+            await TestBasicGraphics(display);
 
             // 测试图片显示
             if (args != null && args.Length > 0)
@@ -87,26 +55,17 @@ class Program
             {
                 await TestImage(display);
             }
-            Task.Delay(5000).Wait();
+            await Task.Delay(testAwait);
 
-            // 亮度
-            Console.WriteLine("Testing backlight...");
-            display.SetBacklight(20);
-            Task.Delay(500).Wait();
-            display.SetBacklight(50);
-            Task.Delay(500).Wait();
-            display.SetBacklight(100);
+            // 亮度测试
+            await TestBacklight(display);
 
-            Task.Delay(5000).Wait();
-
-            // 局部刷新
-            Console.WriteLine("Testing partial update...");
-            display.FillRect(System.Drawing.Color.Azure, 100, 0, 100, 100);
-            display.SendFrame(false);
+            // 局部刷新测试
+            await TestPartialUpdate(display);
 
             Console.WriteLine("All tests completed.");
 
-            Task.Delay(2000).Wait();
+            await Task.Delay(testAwait);
         }
         catch (Exception ex)
         {
@@ -115,19 +74,73 @@ class Program
         }
     }
 
+    private static async Task TestBasicColors(NV3030B display)
+    {
+        Console.WriteLine("Testing basic colors...");
+        display.ClearScreen(System.Drawing.Color.Red, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.Green, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.Blue, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.White, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.Black, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.Yellow, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.Cyan, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.Magenta, true);
+        await Task.Delay(200);
+        display.ClearScreen(System.Drawing.Color.Gray, true);
+        await Task.Delay(200);
+    }
+
+    private static async Task TestBasicGraphics(NV3030B display)
+    {
+        Console.WriteLine("Testing basic graphics...");
+        display.ClearScreen(System.Drawing.Color.Red, true);
+        Console.WriteLine("Testing fill rectangle...");
+        display.FillRect(System.Drawing.Color.Blue, 0, 0, 100, 100);
+        display.FillRect(System.Drawing.Color.Green, 100, 0, 100, 100);
+        display.SendFrame(false);
+        await Task.Delay(testAwait);
+        Console.WriteLine("Testing clear screen...");
+        display.ClearScreen(true);
+    }
+
+    private static async Task TestBacklight(NV3030B display)
+    {
+        Console.WriteLine("Testing backlight...");
+        display.SetBacklight(20);
+        await Task.Delay(500);
+        display.SetBacklight(50);
+        await Task.Delay(500);
+        display.SetBacklight(100);
+        await Task.Delay(testAwait);
+    }
+
+    private static async Task TestPartialUpdate(NV3030B display)
+    {
+        Console.WriteLine("Testing partial update...");
+        using var image = BitmapImage.CreateFromFile("LCD_1inch5.jpg");
+        display.DrawBitmap(image, new System.Drawing.Point(0, 100), new System.Drawing.Rectangle(0, 0, 100, 100), true);
+        await Task.Delay(testAwait);
+    }
 
     private static async Task TestImage(NV3030B display, string file = "LCD_1inch5.jpg")
     {
-
+        Console.WriteLine("Testing image display...");
         try
         {
             using var image = BitmapImage.CreateFromFile(file);
             display.DrawBitmap(image);
-
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to load or display image: {ex.Message}");
         }
+        await Task.Delay(testAwait);
     }
 }
